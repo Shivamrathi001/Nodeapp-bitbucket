@@ -1,0 +1,77 @@
+image: atlassian/default-image:2
+
+pipelines:
+  default:
+    - step:
+          name: Build Docker Image
+          script:
+            - IMAGE_NAME=${IMAGE_NAME}
+            - docker build . --file Dockerfile --tag ${IMAGE_NAME}
+            - docker save ${IMAGE_NAME} --output "${IMAGE_NAME}.tar"
+          services:
+            - docker
+          caches:
+            - docker
+          artifacts:
+            - "*.tar"
+    - step:
+          name: Push to Dockerhub
+          script:
+            - echo ${DOCKERHUB_PASSWORD} | docker login --username "$DOCKERHUB_USERNAME" --password-stdin
+            - IMAGE=${DOCKERHUB_USERNAME}/${IMAGE_NAME}
+            - docker load --input "${IMAGE_NAME}.tar"
+            - echo $IMAGE_NAME 
+            - docker tag "${IMAGE_NAME}" "${DOCKERHUB_USERNAME}/${IMAGE_NAME}"
+            - docker push "${DOCKERHUB_USERNAME}/${IMAGE_NAME}"
+          services:
+            - docker
+    - step:
+        name: Build
+        script:
+          - apt-get update
+          - apt-get install -y zip
+          - zip -r weatherapp.zip *
+        artifacts:
+          - weatherapp.zip
+    # - step:
+    #     name: Test
+    #     script:
+    #       - npm run test
+    #     artifacts:
+    - step:
+        name: Upload to S3
+        services:
+          - docker
+        script:
+          # Test upload
+          - pipe: atlassian/aws-code-deploy:0.2.10
+            variables:
+              AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+              AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+              AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION}
+              COMMAND: 'upload'
+              APPLICATION_NAME: ${APPLICATION_NAME}
+              S3_BUCKET: ${S3_BUCKET}
+              ZIP_FILE: 'weatherapp.zip'
+
+    - step:
+        name: Deploy with CodeDeploy
+        deployment: production
+        services:
+        - docker
+        script:
+        # Test upload
+        - pipe: atlassian/aws-code-deploy:0.2.10
+          variables:
+            AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+            AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+            AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION}
+            COMMAND: 'deploy'
+            APPLICATION_NAME: ${APPLICATION_NAME}
+            DEPLOYMENT_GROUP: ${DEPLOYMENT_GROUP}
+            S3_BUCKET: ${S3_BUCKET}
+            IGNORE_APPLICATION_STOP_FAILURES: 'true'
+            FILE_EXISTS_BEHAVIOR: 'OVERWRITE'
+            WAIT: 'true'
+
+
