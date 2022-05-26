@@ -30,9 +30,9 @@ pipelines:
         script:
           - apt-get update
           - apt-get install -y zip
-          - zip -r weatherapp.zip *
+          - zip -r {APP_NAME}.zip *
         artifacts:
-          - weatherapp.zip
+          - {APP_NAME}.zip
     # - step:
     #     name: Test
     #     script:
@@ -52,7 +52,7 @@ pipelines:
               COMMAND: 'upload'
               APPLICATION_NAME: ${APPLICATION_NAME}
               S3_BUCKET: ${S3_BUCKET}
-              ZIP_FILE: 'weatherapp.zip'
+              ZIP_FILE: '${APP_NAME}.zip'
 
     - step:
         name: Deploy with CodeDeploy
